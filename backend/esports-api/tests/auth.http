@@ -1,0 +1,59 @@
+@baseUrl = http://localhost:3000/api/v1
+
+### 1. Sin sesión: escribir no se permite (401)
+POST {{baseUrl}}/jugadores
+Content-Type: application/json
+
+{ "nickname": "Auth_T", "rol": "Mid" }
+
+### 2. Sin sesión: leer sí se permite (200)
+GET {{baseUrl}}/jugadores
+
+### 3. Login con contraseña incorrecta (401)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "incorrecta" }
+
+### 4. Login sin datos (400)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ }
+
+### 5. Login correcto (200, con cookies)
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "password_040419" }
+
+###
+@csrf = {{login.response.body.csrfToken}}
+
+### 6. Verificar sesión (200)
+GET {{baseUrl}}/auth/verify
+
+### 7. Con sesión pero SIN token CSRF (403)
+POST {{baseUrl}}/jugadores
+Content-Type: application/json
+
+{ "nickname": "Auth_T", "rol": "Mid" }
+
+### 8. Con sesión y CSRF (201)
+POST {{baseUrl}}/jugadores
+Content-Type: application/json
+x-csrf-token: {{csrf}}
+
+{ "nickname": "Auth_T", "rol": "Mid" }
+
+### 9. Logout (204)
+POST {{baseUrl}}/auth/logout
+x-csrf-token: {{csrf}}
+
+### 10. Tras el logout, escribir vuelve a dar 401
+POST {{baseUrl}}/jugadores
+Content-Type: application/json
+x-csrf-token: {{csrf}}
+
+{ "nickname": "Auth_T2", "rol": "Mid" }

@@ -1,0 +1,441 @@
+@baseUrl = http://localhost:3000/api/v1
+@json = application/json
+
+###############################################
+# 0. AUXILIARES
+###############################################
+
+### Health
+GET {{baseUrl}}/health
+
+### Roles válidos
+GET {{baseUrl}}/roles
+
+### Estados válidos
+GET {{baseUrl}}/estados
+
+### Tipos de roster
+GET {{baseUrl}}/tipos-roster
+
+### Ruta inexistente (404)
+GET {{baseUrl}}/nada
+
+###############################################
+# 1. JUGADORES - CREAR (201)
+###############################################
+
+### Crear Faker (Mid)
+# @name crearFaker
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{
+  "nickname": "Faker_T",
+  "nombre_real": "Lee Sang-hyeok",
+  "pais": "Corea del Sur",
+  "rol": "Mid",
+  "estado": "activo"
+}
+
+###
+@faker = {{crearFaker.response.body.id}}
+
+### Crear Impact (Top)
+# @name crearImpact
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{ "nickname": "Impact_T", "pais": "Estados Unidos", "rol": "Top" }
+
+###
+@impact = {{crearImpact.response.body.id}}
+
+### Crear Oner (Jungle)
+# @name crearOner
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{ "nickname": "Oner_T", "rol": "Jungle" }
+
+###
+@oner = {{crearOner.response.body.id}}
+
+### Crear Gumayusi (ADC)
+# @name crearGumayusi
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{ "nickname": "Gumayusi_T", "rol": "ADC" }
+
+###
+@gumayusi = {{crearGumayusi.response.body.id}}
+
+### Crear Keria (Support)
+# @name crearKeria
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{ "nickname": "Keria_T", "rol": "Support" }
+
+###
+@keria = {{crearKeria.response.body.id}}
+
+### Crear Chovy (Mid, para probar RN-03)
+# @name crearChovy
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{ "nickname": "Chovy_T", "rol": "Mid", "estado": "inactivo" }
+
+###
+@chovy = {{crearChovy.response.body.id}}
+
+###############################################
+# 2. JUGADORES - ERRORES
+###############################################
+
+### Nickname duplicado, misma capitalización (409)
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{ "nickname": "Faker_T", "rol": "Mid" }
+
+### Nickname duplicado, distinta capitalización (409)
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{ "nickname": "faker_t", "rol": "Mid" }
+
+### Rol inválido (400)
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{ "nickname": "Tester", "rol": "Tank" }
+
+### Estado inválido (400)
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{ "nickname": "Tester", "rol": "Mid", "estado": "baneado" }
+
+### Sin nickname (400)
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{ "rol": "Mid" }
+
+### JSON mal formado (400)
+POST {{baseUrl}}/jugadores
+Content-Type: {{json}}
+
+{ "nickname": "Roto", 
+
+### Id no numérico (400)
+GET {{baseUrl}}/jugadores/abc
+
+### Jugador inexistente (404)
+GET {{baseUrl}}/jugadores/999999
+
+###############################################
+# 3. JUGADORES - LEER, FILTRAR, EDITAR
+###############################################
+
+### Listar todos (200)
+GET {{baseUrl}}/jugadores
+
+### Filtrar por rol
+GET {{baseUrl}}/jugadores?rol=Mid
+
+### Filtrar por estado
+GET {{baseUrl}}/jugadores?estado=inactivo
+
+### Buscar por nickname
+GET {{baseUrl}}/jugadores?search=fak
+
+### Combinar filtros
+GET {{baseUrl}}/jugadores?rol=Mid&estado=activo&search=fak
+
+### Filtro con rol inválido (400)
+GET {{baseUrl}}/jugadores?rol=Tank
+
+### Detalle de Faker (200)
+GET {{baseUrl}}/jugadores/{{faker}}
+
+### Editar país de Faker (200)
+PUT {{baseUrl}}/jugadores/{{faker}}
+Content-Type: {{json}}
+
+{ "pais": "Corea" }
+
+### Editar con nickname de otro jugador (409)
+PUT {{baseUrl}}/jugadores/{{faker}}
+Content-Type: {{json}}
+
+{ "nickname": "Impact_T" }
+
+### Editar con rol inválido (400)
+PUT {{baseUrl}}/jugadores/{{faker}}
+Content-Type: {{json}}
+
+{ "rol": "Tank" }
+
+### Editar jugador inexistente (404)
+PUT {{baseUrl}}/jugadores/999999
+Content-Type: {{json}}
+
+{ "pais": "X" }
+
+###############################################
+# 4. ROSTERS - CRUD
+###############################################
+
+### Crear roster Principal (201)
+# @name crearRoster
+POST {{baseUrl}}/rosters
+Content-Type: {{json}}
+
+{
+  "nombre": "TL Principal",
+  "juego": "League of Legends",
+  "tipo": "Principal",
+  "temporada": "2026"
+}
+
+###
+@roster = {{crearRoster.response.body.id}}
+
+### Crear roster Academy sin juego (usa el valor por defecto) (201)
+# @name crearAcademy
+POST {{baseUrl}}/rosters
+Content-Type: {{json}}
+
+{ "nombre": "TL Academy", "tipo": "Academy", "temporada": "2025" }
+
+###
+@academy = {{crearAcademy.response.body.id}}
+
+### Sin nombre (400)
+POST {{baseUrl}}/rosters
+Content-Type: {{json}}
+
+{ "tipo": "Principal", "temporada": "2026" }
+
+### Tipo inválido (400)
+POST {{baseUrl}}/rosters
+Content-Type: {{json}}
+
+{ "nombre": "X", "tipo": "Otro", "temporada": "2026" }
+
+### Sin temporada (400)
+POST {{baseUrl}}/rosters
+Content-Type: {{json}}
+
+{ "nombre": "X", "tipo": "Principal" }
+
+### Listar rosters (200, con cantidad_jugadores)
+GET {{baseUrl}}/rosters
+
+### Filtrar por tipo
+GET {{baseUrl}}/rosters?tipo=Academy
+
+### Filtrar por tipo y temporada
+GET {{baseUrl}}/rosters?tipo=Principal&temporada=2026
+
+### Filtro con tipo inválido (400)
+GET {{baseUrl}}/rosters?tipo=Otro
+
+### Detalle de roster (200)
+GET {{baseUrl}}/rosters/{{roster}}
+
+### Roster inexistente (404)
+GET {{baseUrl}}/rosters/999999
+
+### Editar roster (200)
+PUT {{baseUrl}}/rosters/{{roster}}
+Content-Type: {{json}}
+
+{ "nombre": "TL Principal 2026" }
+
+### Editar con tipo inválido (400)
+PUT {{baseUrl}}/rosters/{{roster}}
+Content-Type: {{json}}
+
+{ "tipo": "Otro" }
+
+### Editar roster inexistente (404)
+PUT {{baseUrl}}/rosters/999999
+Content-Type: {{json}}
+
+{ "nombre": "X" }
+
+###############################################
+# 5. ASIGNACIONES - CASOS DE ÉXITO (201)
+###############################################
+
+### Lista vacía al inicio (200)
+GET {{baseUrl}}/rosters/{{roster}}/jugadores
+
+### Faker Titular
+POST {{baseUrl}}/rosters/{{roster}}/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": {{faker}}, "rol_en_roster": "Titular" }
+
+### Impact Titular
+POST {{baseUrl}}/rosters/{{roster}}/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": {{impact}}, "rol_en_roster": "Titular" }
+
+### Oner Titular
+POST {{baseUrl}}/rosters/{{roster}}/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": {{oner}}, "rol_en_roster": "Titular" }
+
+### Gumayusi Titular
+POST {{baseUrl}}/rosters/{{roster}}/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": {{gumayusi}}, "rol_en_roster": "Titular" }
+
+### Keria Titular (5.º titular)
+POST {{baseUrl}}/rosters/{{roster}}/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": {{keria}}, "rol_en_roster": "Titular" }
+
+### Chovy Suplente (aunque es Mid, como suplente sí puede) (201)
+POST {{baseUrl}}/rosters/{{roster}}/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": {{chovy}}, "rol_en_roster": "Suplente" }
+
+###############################################
+# 6. ASIGNACIONES - REGLAS DE NEGOCIO Y ERRORES
+###############################################
+
+### RN: jugador ya asignado a ese roster (409)
+POST {{baseUrl}}/rosters/{{roster}}/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": {{faker}}, "rol_en_roster": "Suplente" }
+
+### RN-02: pasar a Chovy a Titular con 5 titulares ya completos (409)
+PUT {{baseUrl}}/rosters/{{roster}}/jugadores/{{chovy}}
+Content-Type: {{json}}
+
+{ "rol_en_roster": "Titular" }
+
+### RN-03: en el roster Academy, Faker Titular (201)
+POST {{baseUrl}}/rosters/{{academy}}/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": {{faker}}, "rol_en_roster": "Titular" }
+
+### RN-03: Chovy también Mid Titular en Academy -> rol repetido (409)
+POST {{baseUrl}}/rosters/{{academy}}/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": {{chovy}}, "rol_en_roster": "Titular" }
+
+### RN-04: Faker puede estar en varios rosters (ya está en 2) - verificar
+GET {{baseUrl}}/jugadores/{{faker}}
+
+### rol_en_roster inválido (400)
+POST {{baseUrl}}/rosters/{{roster}}/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": {{chovy}}, "rol_en_roster": "Capitan" }
+
+### Sin id_jugador (400)
+POST {{baseUrl}}/rosters/{{roster}}/jugadores
+Content-Type: {{json}}
+
+{ "rol_en_roster": "Suplente" }
+
+### Jugador inexistente (404)
+POST {{baseUrl}}/rosters/{{roster}}/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": 999999, "rol_en_roster": "Suplente" }
+
+### Roster inexistente (404)
+POST {{baseUrl}}/rosters/999999/jugadores
+Content-Type: {{json}}
+
+{ "id_jugador": {{faker}}, "rol_en_roster": "Suplente" }
+
+### Listar jugadores de un roster inexistente (404)
+GET {{baseUrl}}/rosters/999999/jugadores
+
+###############################################
+# 7. ASIGNACIONES - CAMBIAR ROL Y QUITAR
+###############################################
+
+### Detalle del roster con sus jugadores (200)
+GET {{baseUrl}}/rosters/{{roster}}
+
+### Listar jugadores del roster (200)
+GET {{baseUrl}}/rosters/{{roster}}/jugadores
+
+### Faker pasa a Suplente (200)
+PUT {{baseUrl}}/rosters/{{roster}}/jugadores/{{faker}}
+Content-Type: {{json}}
+
+{ "rol_en_roster": "Suplente" }
+
+### Ahora Chovy sí puede ser Titular Mid (200)
+PUT {{baseUrl}}/rosters/{{roster}}/jugadores/{{chovy}}
+Content-Type: {{json}}
+
+{ "rol_en_roster": "Titular" }
+
+### Confirmar el mismo rol en el PUT no choca consigo mismo (200)
+PUT {{baseUrl}}/rosters/{{roster}}/jugadores/{{chovy}}
+Content-Type: {{json}}
+
+{ "rol_en_roster": "Titular" }
+
+### rol_en_roster inválido en PUT (400)
+PUT {{baseUrl}}/rosters/{{roster}}/jugadores/{{chovy}}
+Content-Type: {{json}}
+
+{ "rol_en_roster": "Capitan" }
+
+### PUT a un jugador que no está en el roster (404)
+PUT {{baseUrl}}/rosters/{{academy}}/jugadores/{{keria}}
+Content-Type: {{json}}
+
+{ "rol_en_roster": "Suplente" }
+
+### Quitar a Faker del roster (204)
+DELETE {{baseUrl}}/rosters/{{roster}}/jugadores/{{faker}}
+
+### Quitar de nuevo al mismo (404)
+DELETE {{baseUrl}}/rosters/{{roster}}/jugadores/{{faker}}
+
+### El jugador sigue existiendo (200)
+GET {{baseUrl}}/jugadores/{{faker}}
+
+###############################################
+# 8. ELIMINAR (204) Y RN-05
+###############################################
+
+### Eliminar roster Academy (204)
+DELETE {{baseUrl}}/rosters/{{academy}}
+
+### Roster eliminado ya no existe (404)
+GET {{baseUrl}}/rosters/{{academy}}
+
+### RN-05: los jugadores siguen existiendo tras borrar el roster (200)
+GET {{baseUrl}}/jugadores
+
+### Eliminar roster principal (204)
+DELETE {{baseUrl}}/rosters/{{roster}}
+
+### Eliminar un jugador (204)
+DELETE {{baseUrl}}/jugadores/{{chovy}}
+
+### Eliminar un jugador ya borrado (404)
+DELETE {{baseUrl}}/jugadores/{{chovy}}

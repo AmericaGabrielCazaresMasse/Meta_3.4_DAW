@@ -1,0 +1,441 @@
+openapi: 3.0.3
+info:
+  title: API de Jugadores y Rosters (eSports)
+  description: |
+    API REST para gestionar jugadores y armar rosters de League of Legends.
+
+    **Autenticación (rol Admin):** `POST /auth/login` crea las cookies `jwt_token` (HTTP-Only) y `csrf_token`.
+    Los métodos POST, PUT y DELETE exigen la cookie de sesión y el header `x-csrf-token` con el valor
+    devuelto en el login. Los GET son públicos.
+  version: 1.1.0
+servers:
+  - url: http://localhost:3000/api/v1
+tags:
+  - name: Autenticación
+  - name: Jugadores
+  - name: Rosters
+  - name: Asignaciones
+  - name: Auxiliares
+
+paths:
+  /auth/login:
+    post:
+      tags: [Autenticación]
+      summary: Iniciar sesión (Admin). Crea las cookies jwt_token y csrf_token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: Sesión iniciada. El csrfToken debe enviarse en el header x-csrf-token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  csrfToken: { type: string }
+                  usuario: { $ref: '#/components/schemas/Usuario' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /auth/logout:
+    post:
+      tags: [Autenticación]
+      summary: Cerrar sesión (elimina las cookies)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204': { description: Sesión cerrada }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /auth/verify:
+    get:
+      tags: [Autenticación]
+      summary: Verificar la sesión actual y recuperar el token CSRF
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Sesión activa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  csrfToken: { type: string }
+                  usuario: { $ref: '#/components/schemas/Usuario' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /jugadores:
+    get:
+      tags: [Jugadores]
+      summary: Listar jugadores (filtros por rol, estado y nickname). Público
+      parameters:
+        - { name: rol, in: query, schema: { $ref: '#/components/schemas/RolJuego' } }
+        - { name: estado, in: query, schema: { $ref: '#/components/schemas/Estado' } }
+        - { name: search, in: query, description: Búsqueda parcial por nickname, schema: { type: string } }
+      responses:
+        '200': { description: Lista de jugadores, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Jugador' } } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '500': { $ref: '#/components/responses/ServerError' }
+    post:
+      tags: [Jugadores]
+      summary: Crear jugador (Admin)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/JugadorInput' } } }
+      responses:
+        '201': { description: Jugador creado, content: { application/json: { schema: { $ref: '#/components/schemas/Jugador' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /jugadores/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Jugadores]
+      summary: Detalle de un jugador. Público
+      responses:
+        '200': { description: Jugador encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/Jugador' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+    put:
+      tags: [Jugadores]
+      summary: Actualizar un jugador (Admin; solo se modifican los campos enviados)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/JugadorUpdate' } } }
+      responses:
+        '200': { description: Jugador actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/Jugador' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/ServerError' }
+    delete:
+      tags: [Jugadores]
+      summary: Eliminar un jugador (Admin; también sus asignaciones)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204': { description: Jugador eliminado }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /rosters:
+    get:
+      tags: [Rosters]
+      summary: Listar rosters con cantidad de jugadores. Público
+      parameters:
+        - { name: tipo, in: query, schema: { $ref: '#/components/schemas/TipoRoster' } }
+        - { name: temporada, in: query, schema: { type: string, example: '2026' } }
+      responses:
+        '200': { description: Lista de rosters, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RosterResumen' } } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '500': { $ref: '#/components/responses/ServerError' }
+    post:
+      tags: [Rosters]
+      summary: Crear roster (Admin)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RosterInput' } } }
+      responses:
+        '201': { description: Roster creado, content: { application/json: { schema: { $ref: '#/components/schemas/RosterDetalle' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /rosters/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Rosters]
+      summary: Detalle de un roster con sus jugadores. Público
+      responses:
+        '200': { description: Roster encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/RosterDetalle' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+    put:
+      tags: [Rosters]
+      summary: Actualizar un roster (Admin)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RosterUpdate' } } }
+      responses:
+        '200': { description: Roster actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/RosterDetalle' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+    delete:
+      tags: [Rosters]
+      summary: Eliminar un roster (Admin; los jugadores no se eliminan, RN-05)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204': { description: Roster eliminado }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /rosters/{id}/jugadores:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Asignaciones]
+      summary: Listar jugadores de un roster. Público
+      responses:
+        '200': { description: Jugadores asignados, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Asignacion' } } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+    post:
+      tags: [Asignaciones]
+      summary: Asignar un jugador a un roster (Admin)
+      description: |
+        409 si: ya hay 5 titulares (RN-02), ya hay un titular con el mismo rol (RN-03)
+        o el jugador ya está en ese roster.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AsignacionInput' } } }
+      responses:
+        '201': { description: Jugador asignado, content: { application/json: { schema: { $ref: '#/components/schemas/Asignacion' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /rosters/{id}/jugadores/{id_jugador}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - { name: id_jugador, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    put:
+      tags: [Asignaciones]
+      summary: Cambiar el rol en el roster, Titular/Suplente (Admin)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rol_en_roster]
+              properties:
+                rol_en_roster: { $ref: '#/components/schemas/RolEnRoster' }
+      responses:
+        '200': { description: Rol actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/Asignacion' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/ServerError' }
+    delete:
+      tags: [Asignaciones]
+      summary: Quitar un jugador del roster (Admin; no se elimina del sistema)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204': { description: Jugador removido del roster }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /roles:
+    get:
+      tags: [Auxiliares]
+      summary: Listar roles de juego válidos
+      responses:
+        '200': { description: Roles válidos, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RolJuego' } } } } }
+  /estados:
+    get:
+      tags: [Auxiliares]
+      summary: Listar estados válidos
+      responses:
+        '200': { description: Estados válidos, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Estado' } } } } }
+  /tipos-roster:
+    get:
+      tags: [Auxiliares]
+      summary: Listar tipos de roster
+      responses:
+        '200': { description: Tipos de roster, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TipoRoster' } } } } }
+  /health:
+    get:
+      tags: [Auxiliares]
+      summary: Verificar que el API está activa
+      responses:
+        '200': { description: API activa, content: { application/json: { schema: { type: object, properties: { status: { type: string, example: ok } } } } } }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: jwt_token
+      description: Cookie HTTP-Only creada por POST /auth/login
+
+  parameters:
+    Id:
+      { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    CsrfToken:
+      { name: x-csrf-token, in: header, required: true, description: Token CSRF devuelto en el login, schema: { type: string } }
+
+  responses:
+    BadRequest:
+      { description: Datos inválidos, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized:
+      { description: No autenticado, sesión expirada o credenciales inválidas, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden:
+      { description: Token CSRF inválido o ausente, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound:
+      { description: Recurso no encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict:
+      { description: Conflicto (nickname duplicado, 5 titulares, rol repetido o jugador ya asignado), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    ServerError:
+      { description: Error interno del servidor, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  schemas:
+    Error:
+      { type: object, properties: { error: { type: string, example: Jugador no encontrado } } }
+
+    Usuario:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        username: { type: string, example: admin }
+        rol: { type: string, example: Admin }
+
+    RolJuego: { type: string, enum: [Top, Jungle, Mid, ADC, Support] }
+    Estado: { type: string, enum: [activo, inactivo] }
+    TipoRoster: { type: string, enum: [Principal, Academy] }
+    RolEnRoster: { type: string, enum: [Titular, Suplente] }
+
+    Jugador:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        nickname: { type: string, example: Faker }
+        nombre_real: { type: string, nullable: true, example: Lee Sang-hyeok }
+        pais: { type: string, nullable: true, example: Corea del Sur }
+        rol: { $ref: '#/components/schemas/RolJuego' }
+        estado: { $ref: '#/components/schemas/Estado' }
+    JugadorInput:
+      type: object
+      required: [nickname, rol]
+      properties:
+        nickname: { type: string, maxLength: 50 }
+        nombre_real: { type: string, maxLength: 100 }
+        pais: { type: string, maxLength: 60 }
+        rol: { $ref: '#/components/schemas/RolJuego' }
+        estado: { $ref: '#/components/schemas/Estado' }
+    JugadorUpdate:
+      type: object
+      properties:
+        nickname: { type: string, maxLength: 50 }
+        nombre_real: { type: string, maxLength: 100 }
+        pais: { type: string, maxLength: 60 }
+        rol: { $ref: '#/components/schemas/RolJuego' }
+        estado: { $ref: '#/components/schemas/Estado' }
+
+    RosterResumen:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string, example: TL Principal }
+        juego: { type: string, example: League of Legends }
+        tipo: { $ref: '#/components/schemas/TipoRoster' }
+        temporada: { type: string, example: '2026' }
+        cantidad_jugadores: { type: integer, example: 5 }
+    RosterInput:
+      type: object
+      required: [nombre, tipo, temporada]
+      properties:
+        nombre: { type: string, maxLength: 100 }
+        juego: { type: string, maxLength: 100, default: League of Legends }
+        tipo: { $ref: '#/components/schemas/TipoRoster' }
+        temporada: { type: string, maxLength: 10 }
+    RosterUpdate:
+      type: object
+      properties:
+        nombre: { type: string, maxLength: 100 }
+        juego: { type: string, maxLength: 100 }
+        tipo: { $ref: '#/components/schemas/TipoRoster' }
+        temporada: { type: string, maxLength: 10 }
+    RosterDetalle:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        juego: { type: string }
+        tipo: { $ref: '#/components/schemas/TipoRoster' }
+        temporada: { type: string }
+        jugadores:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              nickname: { type: string }
+              rol: { $ref: '#/components/schemas/RolJuego' }
+              rol_en_roster: { $ref: '#/components/schemas/RolEnRoster' }
+
+    AsignacionInput:
+      type: object
+      required: [id_jugador, rol_en_roster]
+      properties:
+        id_jugador: { type: integer, minimum: 1 }
+        rol_en_roster: { $ref: '#/components/schemas/RolEnRoster' }
+    Asignacion:
+      type: object
+      properties:
+        id_roster: { type: integer }
+        id_jugador: { type: integer }
+        nickname: { type: string }
+        rol: { $ref: '#/components/schemas/RolJuego' }
+        rol_en_roster: { $ref: '#/components/schemas/RolEnRoster' }
